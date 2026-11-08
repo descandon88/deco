@@ -22,7 +22,7 @@ from deco.db import build_db, run_query
 from deco.memory import Brain
 from deco.tools import Toolbox
 
-app = typer.Typer(help="Deco: mentor de IA con memoria propia.", no_args_is_help=True)
+app = typer.Typer(help="Deco: mentor de IA con memoria propia. Sin argumentos abre el chat.")
 console = Console()
 
 HELP = """[bold]Comandos dentro del chat[/bold]
@@ -31,6 +31,8 @@ HELP = """[bold]Comandos dentro del chat[/bold]
   /mock <tema>        entrevista simulada (ej: /mock sql window functions)
   /roadmap \\[foco]     roadmap de 4 semanas basado en datos
   /weekly             revisión semanal
+  /learn <tema>       explicación + preguntas (ej: /learn dbt incremental models)
+  /lang es|en|mix     idioma de las respuestas
   /model <nombre>     cambiar de modelo en caliente
   /help  /salir"""
 
@@ -53,7 +55,7 @@ def _make_agent(model: str | None = None) -> Agent:
         console.print(f"[red]No existe el brain en {brain.root}.[/red] Corré: deco init")
         raise typer.Exit(1)
     toolbox = Toolbox(brain, settings, confirm=_confirm)
-    agent = Agent(brain, toolbox, model=model or settings.model)
+    agent = Agent(brain, toolbox, model=model or settings.model, language=settings.language)
     agent.on_wait = lambda s: console.print(
         f"[yellow]  ⏳ límite de tokens del proveedor: espero {s:.0f}s y reintento...[/yellow]"
     )
@@ -75,6 +77,8 @@ def _expand_command(line: str) -> str | None:
         return load_prompt("mock") + " " + (arg or "elegilo vos según mis brechas")
     if cmd == "/roadmap":
         return load_prompt("roadmap") + " " + (arg or "general")
+    if cmd == "/learn":
+        return load_prompt("learn") + " " + (arg or "elegilo vos según mis brechas")
     if cmd == "/weekly":
         return load_prompt("weekly")
     console.print(f"[yellow]Comando desconocido: {cmd}[/yellow]")
@@ -85,6 +89,13 @@ def _answer(agent: Agent, text: str) -> None:
     with console.status("[cyan]pensando...[/cyan]"):
         reply = agent.ask(text, on_tool=_on_tool)
     console.print(Markdown(reply))
+
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """Sin subcomando, `deco` abre el chat."""
+    if ctx.invoked_subcommand is None:
+        chat(model=None)
 
 
 @app.command()
@@ -103,6 +114,13 @@ def chat(model: str | None = typer.Option(None, help="Override del modelo (forma
             break
         if line == "/help":
             console.print(HELP)
+            continue
+        if line.startswith("/lang"):
+            try:
+                agent.set_language(line.partition(" ")[2].strip().lower() or agent.language)
+                console.print(f"Idioma: {agent.language}")
+            except ValueError as exc:
+                console.print(f"[yellow]{exc}[/yellow]")
             continue
         if line.startswith("/model"):
             agent.model = line.partition(" ")[2].strip() or agent.model
@@ -154,8 +172,7 @@ def build_db_cmd():
 def sql(query: str):
     """Consulta SQL de solo lectura sobre tu brain (ej: deco sql 'select * from mart_skill_gaps')."""
     s = load_settings()
-    if not s.db_path.exists():
-        build_db(Brain(s.brain_path), s.db_path)
+    build_db(Brain(s.brain_path), s.db_path)  # siempre fresca: el brain pudo cambiar
     cols, rows = run_query(s.db_path, query)
     table = Table(*cols)
     for r in rows:

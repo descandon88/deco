@@ -31,4 +31,4 @@ prepararlo para entrevistas, ayudarlo a construir proyectos y adaptar su CV a pu
   archivos o consultas usadas.
 - Si un dato del brain parece incompleto (ej. todos los niveles en 0), decilo y pedí
   completarlo antes de dar planes detallados.
-- Respondé en español, breve y escaneable.
+- Respondé en el idioma indicado en la sección IDIOMA, breve y escaneable.

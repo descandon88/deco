@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from deco.agent import Agent
+from deco.cli import _expand_command
 from deco.config import Settings
 from deco.db import build_db, run_query
 from deco.memory import Brain
@@ -140,3 +141,30 @@ def test_rate_limit_waits_and_retries(brain: Brain, settings: Settings):
     assert agent.ask("hola") == "ok"
     assert calls["n"] == 2
     assert 3.0 <= waits[0] < 3.1  # 2.055s + 1s de margen
+
+
+def test_language_switch_rewrites_system_prompt(brain: Brain, settings: Settings):
+    agent = Agent(brain, Toolbox(brain, settings, confirm=lambda *_: True), "fake", language="es")
+    assert "español" in agent.messages[0]["content"]
+    agent.set_language("en")
+    assert "Always answer in English" in agent.messages[0]["content"]
+    with pytest.raises(ValueError):
+        agent.set_language("fr")
+    assert agent.language == "en"  # un idioma inválido no rompe el estado
+
+
+def test_db_is_rebuilt_each_session(brain: Brain, settings: Settings):
+    build_db(brain, settings.db_path)  # DB "vieja"
+    skills = brain.read("skills.yaml").replace(
+        "id: dbt\n      name: dbt (modelos, tests, docs, macros, incrementales)\n      level: 0",
+        "id: dbt\n      name: dbt (modelos, tests, docs, macros, incrementales)\n      level: 2",
+    )
+    brain.write("skills.yaml", skills)
+    tb = Toolbox(brain, settings, confirm=lambda *_: True)  # nueva sesión
+    out = tb.call("query_db", {"sql": "select level from skills where skill_id = 'dbt'"})
+    assert out.splitlines()[1] == "2"
+
+
+def test_learn_command_expands(brain: Brain):
+    prompt = _expand_command("/learn dbt incremental models")
+    assert prompt.startswith("Modo APRENDER") and prompt.endswith("dbt incremental models")

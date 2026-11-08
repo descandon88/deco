@@ -46,15 +46,27 @@ def _default_completion(**kwargs: Any) -> Any:
 
 class Agent:
     def __init__(
-        self, brain: Brain, toolbox: Toolbox, model: str, completion: Callable[..., Any] = _default_completion
+        self,
+        brain: Brain,
+        toolbox: Toolbox,
+        model: str,
+        completion: Callable[..., Any] = _default_completion,
+        language: str = "es",
     ):
         self.brain = brain
         self.toolbox = toolbox
         self.model = model
         self.completion = completion
-        self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain)}]
+        self.language = language
+        self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain, language)}]
         self.on_wait: OnWaitFn | None = None
         self.sleep: Callable[[float], None] = time.sleep
+
+    def set_language(self, language: str) -> None:
+        """Cambia el idioma en caliente: reescribe el prompt del sistema (se valida antes)."""
+        prompt = build_system_prompt(self.brain, language)
+        self.language = language
+        self.messages[0] = {"role": "system", "content": prompt}
 
     def _complete(self) -> Any:
         """Llama al modelo; ante un rate limit espera lo que pide el proveedor y reintenta."""

@@ -129,7 +129,8 @@ class Toolbox:
         self.brain = brain
         self.settings = settings
         self.confirm = confirm
-        self._db_dirty = not settings.db_path.exists()
+        # se reconstruye en la primera consulta de cada sesión: el brain pudo cambiar a mano
+        self._db_dirty = True
 
     def call(self, name: str, raw_args: str | dict) -> str:
         try:

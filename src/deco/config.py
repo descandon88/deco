@@ -16,6 +16,7 @@ class Settings:
     fast_model: str  # modelo rápido/barato (resúmenes, clasificación)
     db_path: Path  # DuckDB derivada (se reconstruye desde el brain)
     auto_commit: bool  # commitear cambios de memoria en el repo del brain
+    language: str = "es"  # es | en | mix
 
 
 def load_settings() -> Settings:
@@ -23,7 +24,7 @@ def load_settings() -> Settings:
     load_dotenv()
     load_dotenv(Path("~/.config/deco/.env").expanduser())
 
-    brain = Path(os.getenv("DECO_BRAIN_PATH", "~/david-brain")).expanduser()
+    brain = Path(os.getenv("DECO_BRAIN_PATH", "~/deco-brain")).expanduser()
     db_default = brain / ".cache" / "brain.duckdb"
     return Settings(
         brain_path=brain,
@@ -31,4 +32,5 @@ def load_settings() -> Settings:
         fast_model=os.getenv("DECO_FAST_MODEL", "anthropic/claude-haiku-5-5"),
         db_path=Path(os.getenv("DECO_DB_PATH", str(db_default))).expanduser(),
         auto_commit=os.getenv("DECO_AUTO_COMMIT", "true").lower() == "true",
+        language=os.getenv("DECO_LANG", "es").lower(),
     )
