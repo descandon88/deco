@@ -1,8 +1,14 @@
 # Deco
 
-**Deco** es un mentor de IA en la terminal para crecer como **Analytics Engineer, Data Engineer y AI Engineer**.
-Conoce mi progreso, mis proyectos y mis debilidades porque **la memoria la controlo yo**:
-vive en un repo privado de archivos de texto y en una DuckDB derivada, no en el chat de un proveedor.
+**Deco** es mi mentor de IA en la terminal. Lo armé para acompañarme en mi aprendizaje
+y en mi maduración profesional en áreas como **Analytics Engineering, Data Engineering
+y AI Engineering**, y en las que vaya sumando con el tiempo, como gobernanza de datos
+o machine learning. Sabe en qué ando, qué proyectos hice, qué construyo, qué me cuesta y qué me falta practicar, y me ayuda a armar un camino concreto para seguir creciendo.
+
+¿La diferencia con un chat común? **La memoria es mía.** No queda guardada en ningún
+proveedor de IA: vive en un repo privado con archivos de texto y en una DuckDB que se
+arma a partir de ellos. Puedo ver, editar y versionar todo lo que Deco "sabe" de mí,
+y cambiar de modelo cuando quiera sin perder nada.
 
 > El modelo es intercambiable (Claude, Groq, Ollama vía LiteLLM). El activo es la memoria
 > y las reglas de cómo se lee y se escribe.
