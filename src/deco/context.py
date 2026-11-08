@@ -33,8 +33,9 @@ def _skills_summary(brain: Brain) -> str:
 
 
 def build_system_prompt(brain: Brain) -> str:
-    journal = "\n\n".join(f"### {path}\n{text}" for path, text in brain.recent_journal())
-    index = "\n".join(brain.list_notes()[:200])
+    journal = "\n\n".join(f"### {path}\n{text}" for path, text in brain.recent_journal(n=2, max_chars=1500))
+    notes = [n for n in brain.list_notes() if "/_" not in n and not n.endswith(".gitkeep")]
+    index = "\n".join(notes[:80])
     return "\n\n".join(
         [
             load_prompt("system"),

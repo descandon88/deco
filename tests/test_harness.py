@@ -106,3 +106,14 @@ def test_agent_loop_uses_tools(brain: Brain, settings: Settings):
     tool_msgs = [m for m in agent.messages if m["role"] == "tool"]
     assert tool_msgs and "skill_id" in tool_msgs[0]["content"]
     assert "Perfil de David" in seen[0][0]["content"]  # el contexto incluye el perfil
+
+
+def test_failed_ask_does_not_leave_dangling_message(brain: Brain, settings: Settings):
+    def boom(**kwargs):
+        raise RuntimeError("rate limit")
+
+    agent = Agent(brain, Toolbox(brain, settings, confirm=lambda *_: True), "fake", completion=boom)
+    before = len(agent.messages)
+    with pytest.raises(RuntimeError):
+        agent.ask("/roadmap")
+    assert len(agent.messages) == before

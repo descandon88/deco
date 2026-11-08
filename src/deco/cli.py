@@ -29,7 +29,7 @@ HELP = """[bold]Comandos dentro del chat[/bold]
   /checkin            check-in guiado del día
   /jd <archivo>       analizar una descripción de puesto
   /mock <tema>        entrevista simulada (ej: /mock sql window functions)
-  /roadmap [foco]     roadmap de 4 semanas basado en datos
+  /roadmap \\[foco]     roadmap de 4 semanas basado en datos
   /weekly             revisión semanal
   /model <nombre>     cambiar de modelo en caliente
   /help  /salir"""

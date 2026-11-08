@@ -18,6 +18,8 @@ from deco.config import Settings
 from deco.db import build_db, run_query
 from deco.memory import Brain
 
+MAX_TOOL_CHARS = 4000
+
 EVENT_TYPES = ["study_session", "checkin", "mock_interview", "project_update", "assessment", "query"]
 
 TOOL_SPECS = [
@@ -135,7 +137,10 @@ class Toolbox:
             handler = getattr(self, f"_t_{name}", None)
             if handler is None:
                 return f"ERROR: herramienta desconocida '{name}'"
-            return handler(**args)
+            result = handler(**args)
+            if len(result) > MAX_TOOL_CHARS:  # cuidar el presupuesto de tokens
+                result = result[:MAX_TOOL_CHARS] + "\n[... recortado; filtrá más la consulta]"
+            return result
         except Exception as exc:  # el modelo recibe el error y puede corregirse
             return f"ERROR: {type(exc).__name__}: {exc}"
 

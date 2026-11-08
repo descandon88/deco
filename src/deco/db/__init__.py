@@ -119,7 +119,7 @@ def build_db(brain: Brain, db_path: Path) -> dict[str, int]:
 _READ_ONLY = re.compile(r"^\s*(select|with|describe|show|summarize)\b", re.IGNORECASE)
 
 
-def run_query(db_path: Path, sql: str, max_rows: int = 50) -> tuple[list[str], list[tuple]]:
+def run_query(db_path: Path, sql: str, max_rows: int = 25) -> tuple[list[str], list[tuple]]:
     """Consulta SOLO lectura: el agente puede mirar, nunca modificar."""
     if not _READ_ONLY.match(sql) or ";" in sql.strip().rstrip(";"):
         raise ValueError("Solo se permite una consulta SELECT/WITH/DESCRIBE/SHOW.")

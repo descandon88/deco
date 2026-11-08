@@ -35,10 +35,23 @@ class Agent:
         self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain)}]
 
     def ask(self, user_text: str, on_tool: OnToolFn | None = None) -> str:
+        checkpoint = len(self.messages)
+        try:
+            return self._ask(user_text, on_tool)
+        except Exception:
+            # si falla (rate limit, red...), no dejar la pregunta "colgada" en el historial
+            del self.messages[checkpoint:]
+            raise
+
+    def _ask(self, user_text: str, on_tool: OnToolFn | None = None) -> str:
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_STEPS):
             response = self.completion(
-                model=self.model, messages=self.messages, tools=TOOL_SPECS, temperature=0.3
+                model=self.model,
+                messages=self.messages,
+                tools=TOOL_SPECS,
+                temperature=0.3,
+                num_retries=3,  # reintenta con espera ante rate limits
             )
             msg = response.choices[0].message
             tool_calls = getattr(msg, "tool_calls", None) or []
