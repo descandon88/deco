@@ -1,4 +1,6 @@
-# Deco
+<h1 align="center">
+  <img src="docs/assets/deco-banner.svg" alt="Deco — mentor de IA en la terminal" width="640">
+</h1>
 
 **Deco** es mi mentor de IA en la terminal. Lo armé para acompañarme en mi aprendizaje
 y en mi maduración profesional en áreas como **Analytics Engineering, Data Engineering
