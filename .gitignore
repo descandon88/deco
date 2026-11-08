@@ -1,0 +1,13 @@
+# Secretos y memoria personal: NUNCA en el repo público
+.env
+brain/
+*.duckdb
+.cache/
+
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/

@@ -1,0 +1,17 @@
+{
+  "env": {
+    "DISABLE_TELEMETRY": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(~/.dbt/profiles.yml)",
+      "Read(./secrets/**)",
+      "Bash(dbt show:*)",
+      "Bash(psql:*)",
+      "Bash(printenv:*)",
+      "Bash(env:*)"
+    ]
+  }
+}

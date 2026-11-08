@@ -1,0 +1,37 @@
+[project]
+name = "deco"
+version = "0.1.0"
+description = "Harness personal de IA: un mentor de terminal para crecer como Analytics / Data / AI Engineer, con memoria que controlo yo."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "litellm>=1.50",
+    "typer>=0.12",
+    "rich>=13",
+    "duckdb>=1.0",
+    "pyyaml>=6",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+deco = "deco.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deco"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["B008"]  # typer usa llamadas en defaults
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

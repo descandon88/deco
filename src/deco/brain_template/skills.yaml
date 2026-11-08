@@ -1,0 +1,83 @@
+# Matriz de skills. Para agregar un dominio nuevo (ej. ml, data_governance),
+# agregá un bloque bajo `domains` con sus skills y un target.
+#
+# Rúbrica de niveles:
+#   0 = no lo conozco
+#   1 = entiendo el concepto
+#   2 = lo hago con guía / tutoriales
+#   3 = lo hago solo en un proyecto propio
+#   4 = lo usé en producción / trabajo real
+#   5 = puedo enseñarlo y diseñar soluciones con criterio
+#
+# Regla: el nivel solo sube con evidencia (link a repo, commit, nota, mock).
+
+domains:
+  analytics_engineering:
+    - id: sql_window_functions
+      name: SQL - window functions
+      level: 0
+      target: 4
+      evidence: []
+    - id: dimensional_modeling
+      name: Modelado dimensional (Kimball, SCD)
+      level: 0
+      target: 4
+      evidence: []
+    - id: dbt
+      name: dbt (modelos, tests, docs, macros, incrementales)
+      level: 0
+      target: 4
+      evidence: []
+
+  data_engineering:
+    - id: python_data
+      name: Python para datos
+      level: 0
+      target: 4
+      evidence: []
+    - id: orchestration
+      name: Orquestación (Airflow / Dagster / Prefect)
+      level: 0
+      target: 3
+      evidence: []
+    - id: cloud_warehouse
+      name: Data warehouse en la nube (BigQuery / Snowflake)
+      level: 0
+      target: 3
+      evidence: []
+    - id: data_quality
+      name: Calidad de datos y testing
+      level: 0
+      target: 3
+      evidence: []
+
+  ai_engineering:
+    - id: llm_apis
+      name: APIs de LLMs y tool calling
+      level: 0
+      target: 4
+      evidence: []
+    - id: rag
+      name: RAG / recuperación y embeddings
+      level: 0
+      target: 3
+      evidence: []
+    - id: llm_evals
+      name: Evaluación de sistemas con LLMs
+      level: 0
+      target: 3
+      evidence: []
+
+  bi:
+    - id: bi_dashboards
+      name: Dashboards y storytelling (Power BI / Looker / Metabase)
+      level: 0
+      target: 3
+      evidence: []
+
+  data_governance:
+    - id: data_catalog_lineage
+      name: Catálogo, linaje y ownership de datos
+      level: 0
+      target: 2
+      evidence: []

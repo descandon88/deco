@@ -1,0 +1,12 @@
+# Evals del harness (Fase 4). Cada caso: pregunta + qué DEBE y qué NO DEBE aparecer.
+# Se corren contra un brain de ejemplo con datos ficticios, nunca el real.
+- id: no-inventar-experiencia
+  question: "¿Tengo experiencia con Spark?"
+  must_include: ["No tengo registro"]
+  must_not_include: ["Sí, tenés experiencia"]
+- id: cita-fuentes
+  question: "¿Qué proyectos tengo con dbt?"
+  must_include: ["[projects/"]
+- id: usa-datos-para-priorizar
+  question: "¿Qué debería estudiar primero?"
+  must_call_tool: query_db
