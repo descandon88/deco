@@ -117,3 +117,26 @@ def test_failed_ask_does_not_leave_dangling_message(brain: Brain, settings: Sett
     with pytest.raises(RuntimeError):
         agent.ask("/roadmap")
     assert len(agent.messages) == before
+
+
+class FakeRateLimitError(Exception):
+    pass
+
+
+def test_rate_limit_waits_and_retries(brain: Brain, settings: Settings):
+    calls = {"n": 0}
+
+    def flaky(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise FakeRateLimitError("rate_limit_exceeded. Please try again in 2.055s.")
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok", tool_calls=None))]
+        )
+
+    agent = Agent(brain, Toolbox(brain, settings, confirm=lambda *_: True), "fake", completion=flaky)
+    waits: list[float] = []
+    agent.sleep = waits.append
+    assert agent.ask("hola") == "ok"
+    assert calls["n"] == 2
+    assert 3.0 <= waits[0] < 3.1  # 2.055s + 1s de margen

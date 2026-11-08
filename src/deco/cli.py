@@ -53,7 +53,11 @@ def _make_agent(model: str | None = None) -> Agent:
         console.print(f"[red]No existe el brain en {brain.root}.[/red] Corré: deco init")
         raise typer.Exit(1)
     toolbox = Toolbox(brain, settings, confirm=_confirm)
-    return Agent(brain, toolbox, model=model or settings.model)
+    agent = Agent(brain, toolbox, model=model or settings.model)
+    agent.on_wait = lambda s: console.print(
+        f"[yellow]  ⏳ límite de tokens del proveedor: espero {s:.0f}s y reintento...[/yellow]"
+    )
+    return agent
 
 
 def _expand_command(line: str) -> str | None:

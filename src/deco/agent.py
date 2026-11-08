@@ -6,6 +6,8 @@ cambiar de proveedor (Anthropic, Groq, Ollama...) o testear sin red.
 
 from __future__ import annotations
 
+import re
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -14,13 +16,31 @@ from deco.memory import Brain
 from deco.tools import TOOL_SPECS, Toolbox
 
 MAX_STEPS = 12
+MAX_RATE_LIMIT_WAITS = 5
+MAX_WAIT_SECONDS = 65
 
 OnToolFn = Callable[[str, str], None]
+OnWaitFn = Callable[[float], None]
+
+_RETRY_IN = re.compile(r"try again in (?:(\d+)m)?([\d.]+)s", re.IGNORECASE)
+
+
+def _rate_limit_wait(exc: Exception) -> float | None:
+    """Si el error es un rate limit, devuelve cuántos segundos esperar (o None)."""
+    text = str(exc)
+    if "RateLimit" not in type(exc).__name__ and "rate_limit" not in text.lower():
+        return None
+    match = _RETRY_IN.search(text)
+    if not match:
+        return 20.0
+    minutes = float(match.group(1) or 0)
+    return min(minutes * 60 + float(match.group(2)) + 1.0, MAX_WAIT_SECONDS)
 
 
 def _default_completion(**kwargs: Any) -> Any:
     import litellm  # import diferido: arranque rápido y tests sin red
 
+    litellm.suppress_debug_info = True  # sin el texto "Give Feedback" en cada error
     return litellm.completion(**kwargs)
 
 
@@ -33,6 +53,24 @@ class Agent:
         self.model = model
         self.completion = completion
         self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain)}]
+        self.on_wait: OnWaitFn | None = None
+        self.sleep: Callable[[float], None] = time.sleep
+
+    def _complete(self) -> Any:
+        """Llama al modelo; ante un rate limit espera lo que pide el proveedor y reintenta."""
+        for attempt in range(MAX_RATE_LIMIT_WAITS + 1):
+            try:
+                return self.completion(
+                    model=self.model, messages=self.messages, tools=TOOL_SPECS, temperature=0.3
+                )
+            except Exception as exc:
+                wait = _rate_limit_wait(exc)
+                if wait is None or attempt == MAX_RATE_LIMIT_WAITS:
+                    raise
+                if self.on_wait:
+                    self.on_wait(wait)
+                self.sleep(wait)
+        raise RuntimeError("unreachable")
 
     def ask(self, user_text: str, on_tool: OnToolFn | None = None) -> str:
         checkpoint = len(self.messages)
@@ -46,13 +84,7 @@ class Agent:
     def _ask(self, user_text: str, on_tool: OnToolFn | None = None) -> str:
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_STEPS):
-            response = self.completion(
-                model=self.model,
-                messages=self.messages,
-                tools=TOOL_SPECS,
-                temperature=0.3,
-                num_retries=3,  # reintenta con espera ante rate limits
-            )
+            response = self._complete()
             msg = response.choices[0].message
             tool_calls = getattr(msg, "tool_calls", None) or []
 
