@@ -19,10 +19,25 @@ MAX_STEPS = 12
 MAX_RATE_LIMIT_WAITS = 5
 MAX_WAIT_SECONDS = 65
 
+MAX_REPEATED_TOKENS = 25
+
 OnToolFn = Callable[[str, str], None]
 OnWaitFn = Callable[[float], None]
 
 _RETRY_IN = re.compile(r"try again in (?:(\d+)m)?([\d.]+)s", re.IGNORECASE)
+
+
+def trim_repetition(text: str) -> str:
+    """Corta la respuesta si el modelo entra en un bucle (el mismo token repetido muchas veces)."""
+    words = list(re.finditer(r"\S+", text))
+    run_start = 0
+    for i in range(1, len(words)):
+        if words[i].group() != words[i - 1].group():
+            run_start = i
+        elif i - run_start + 1 >= MAX_REPEATED_TOKENS:
+            cut = words[run_start].start()
+            return text[:cut].rstrip() + "\n\n[respuesta cortada: el modelo entró en un bucle]"
+    return text
 
 
 def _rate_limit_wait(exc: Exception) -> float | None:
@@ -52,12 +67,16 @@ class Agent:
         model: str,
         completion: Callable[..., Any] = _default_completion,
         language: str = "es",
+        temperature: float = 0.7,
+        max_tokens: int = 2500,
     ):
         self.brain = brain
         self.toolbox = toolbox
         self.model = model
         self.completion = completion
         self.language = language
+        self.temperature = temperature
+        self.max_tokens = max_tokens
         self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain, language)}]
         self.on_wait: OnWaitFn | None = None
         self.sleep: Callable[[float], None] = time.sleep
@@ -73,7 +92,11 @@ class Agent:
         for attempt in range(MAX_RATE_LIMIT_WAITS + 1):
             try:
                 return self.completion(
-                    model=self.model, messages=self.messages, tools=TOOL_SPECS, temperature=0.3
+                    model=self.model,
+                    messages=self.messages,
+                    tools=TOOL_SPECS,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
                 )
             except Exception as exc:
                 wait = _rate_limit_wait(exc)
@@ -113,7 +136,9 @@ class Agent:
             self.messages.append(assistant)
 
             if not tool_calls:
-                return msg.content or ""
+                clean = trim_repetition(msg.content or "")
+                assistant["content"] = clean  # no guardar el bucle en el historial
+                return clean
 
             for tc in tool_calls:
                 if on_tool:

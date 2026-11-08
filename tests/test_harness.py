@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from deco.agent import Agent
+from deco.agent import Agent, trim_repetition
 from deco.cli import _expand_command
 from deco.config import Settings
 from deco.db import build_db, run_query
@@ -168,3 +168,29 @@ def test_db_is_rebuilt_each_session(brain: Brain, settings: Settings):
 def test_learn_command_expands(brain: Brain):
     prompt = _expand_command("/learn dbt incremental models")
     assert prompt.startswith("Modo APRENDER") and prompt.endswith("dbt incremental models")
+
+
+def test_trim_repetition_cuts_loops():
+    looping = "Pregunta 3: ¿qué aprendiste?  " + "---   " * 200
+    out = trim_repetition(looping)
+    assert out.startswith("Pregunta 3: ¿qué aprendiste?")
+    assert "bucle" in out and out.count("---") < 5
+    normal = "Una respuesta normal con - guiones - y texto."
+    assert trim_repetition(normal) == normal
+
+
+def test_banner_matches_logo_grid():
+    from deco.banner import ROW_COLORS, WORD, banner_lines
+
+    lines = banner_lines()
+    assert len(lines) == len(WORD) == len(ROW_COLORS) == 7
+    assert all("██" in line for line in lines)
+
+
+def test_dog_icon_renders_half_blocks():
+    from deco.banner import DOG, dog_lines
+
+    assert all(len(row) == len(DOG[0]) for row in DOG) and len(DOG) % 2 == 0
+    lines = dog_lines()
+    assert len(lines) == len(DOG) // 2
+    assert any("▀" in line.plain for line in lines)

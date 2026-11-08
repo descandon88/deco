@@ -16,6 +16,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from deco.agent import Agent
+from deco.banner import print_banner
 from deco.config import load_settings
 from deco.context import load_prompt
 from deco.db import build_db, run_query
@@ -55,7 +56,14 @@ def _make_agent(model: str | None = None) -> Agent:
         console.print(f"[red]No existe el brain en {brain.root}.[/red] Corré: deco init")
         raise typer.Exit(1)
     toolbox = Toolbox(brain, settings, confirm=_confirm)
-    agent = Agent(brain, toolbox, model=model or settings.model, language=settings.language)
+    agent = Agent(
+        brain,
+        toolbox,
+        model=model or settings.model,
+        language=settings.language,
+        temperature=settings.temperature,
+        max_tokens=settings.max_tokens,
+    )
     agent.on_wait = lambda s: console.print(
         f"[yellow]  ⏳ límite de tokens del proveedor: espero {s:.0f}s y reintento...[/yellow]"
     )
@@ -102,6 +110,7 @@ def main(ctx: typer.Context):
 def chat(model: str | None = typer.Option(None, help="Override del modelo (formato LiteLLM).")):
     """Sesión interactiva."""
     agent = _make_agent(model)
+    print_banner(console)
     console.print(Panel(f"Deco · modelo: [bold]{agent.model}[/bold]\n{HELP}"))
     while True:
         try:

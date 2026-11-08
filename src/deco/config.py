@@ -17,6 +17,8 @@ class Settings:
     db_path: Path  # DuckDB derivada (se reconstruye desde el brain)
     auto_commit: bool  # commitear cambios de memoria en el repo del brain
     language: str = "es"  # es | en | mix
+    temperature: float = 0.7
+    max_tokens: int = 2500  # tope por respuesta: corta bucles y cuida el límite de tokens
 
 
 def load_settings() -> Settings:
@@ -33,4 +35,6 @@ def load_settings() -> Settings:
         db_path=Path(os.getenv("DECO_DB_PATH", str(db_default))).expanduser(),
         auto_commit=os.getenv("DECO_AUTO_COMMIT", "true").lower() == "true",
         language=os.getenv("DECO_LANG", "es").lower(),
+        temperature=float(os.getenv("DECO_TEMPERATURE", "0.7")),
+        max_tokens=int(os.getenv("DECO_MAX_TOKENS", "2500")),
     )
