@@ -23,7 +23,8 @@ from deco.db import build_db, run_query
 from deco.memory import Brain
 from deco.tools import Toolbox
 
-app = typer.Typer(help="Deco: mentor de IA con memoria propia. Sin argumentos abre el chat.")
+# app = typer.Typer(help="Deco: mentor de IA con memoria propia. Sin argumentos abre el chat.")
+app = typer.Typer(help="Deco: asesor técnico de IA con memoria propia. Sin argumentos abre el chat.")
 console = Console()
 
 HELP = """[bold]Comandos dentro del chat[/bold]
@@ -36,6 +37,13 @@ HELP = """[bold]Comandos dentro del chat[/bold]
   /lang es|en|mix     idioma de las respuestas
   /model <nombre>     cambiar de modelo en caliente
   /help  /salir"""
+
+# Bienvenida mínima: solo lo básico; /help muestra la lista completa.
+WELCOME = (
+    "Contame en qué estás trabajando, o probá:\n"
+    "  [bold]/checkin[/bold] · [bold]/roadmap[/bold] · [bold]/help[/bold]"
+    "          [dim](/salir para terminar)[/dim]"
+)
 
 
 def _confirm(path: str, diff: str, reason: str) -> bool:
@@ -111,7 +119,8 @@ def chat(model: str | None = typer.Option(None, help="Override del modelo (forma
     """Sesión interactiva."""
     agent = _make_agent(model)
     print_banner(console)
-    console.print(Panel(f"Deco · modelo: [bold]{agent.model}[/bold]\n{HELP}"))
+    # console.print(Panel(f"Deco · modelo: [bold]{agent.model}[/bold]\n{HELP}"))
+    console.print(Panel(f"[dim]modelo: {agent.model}[/dim]\n{WELCOME}"))
     while True:
         try:
             line = console.input("[bold green]tú ›[/bold green] ").strip()
@@ -121,7 +130,8 @@ def chat(model: str | None = typer.Option(None, help="Override del modelo (forma
             continue
         if line in ("/salir", "/exit", "/quit"):
             break
-        if line == "/help":
+        # if line == "/help":
+        if line in ("/help", "/"):
             console.print(HELP)
             continue
         if line.startswith("/lang"):
