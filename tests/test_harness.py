@@ -194,3 +194,119 @@ def test_dog_icon_renders_half_blocks():
     lines = dog_lines()
     assert len(lines) == len(DOG) // 2
     assert any("▀" in line.plain for line in lines)
+
+
+# ---------- observabilidad ----------
+def _resp(content=None, tool_calls=None, prompt=100, completion=20):
+    usage = SimpleNamespace(prompt_tokens=prompt, completion_tokens=completion)
+    msg = SimpleNamespace(content=content, tool_calls=tool_calls)
+    return SimpleNamespace(choices=[SimpleNamespace(message=msg)], usage=usage)
+
+
+def test_telemetry_records_calls_and_loads_into_marts(brain: Brain, settings: Settings):
+    from deco.telemetry import Telemetry
+
+    script = [
+        _resp(tool_calls=[_tool_call("query_db", {"sql": "select 1"})]),
+        _resp(content="Listo [profile.md]"),
+    ]
+    agent = Agent(
+        brain,
+        Toolbox(brain, settings, confirm=lambda *_: True),
+        "fake/model",
+        completion=lambda **kw: script.pop(0),
+    )
+    agent.telemetry = Telemetry(brain=brain)
+    agent.ask("hola")
+    s = agent.telemetry.summary()
+    assert s["llamadas"] == 2 and s["tokens_entrada"] == 200 and s["herramientas"] == 1
+
+    counts = build_db(brain, settings.db_path)
+    assert counts["llm_calls"] == 2
+    _, rows = run_query(settings.db_path, "select calls, prompt_tokens from mart_llm_usage_daily")
+    assert rows == [(2, 200)]
+    _, tools = run_query(settings.db_path, "select tool, uses from mart_tool_usage")
+    assert tools == [("query_db", 1)]
+
+
+def test_telemetry_records_errors(brain: Brain, settings: Settings):
+    def boom(**kw):
+        raise RuntimeError("caída de red")
+
+    agent = Agent(brain, Toolbox(brain, settings, confirm=lambda *_: True), "fake", completion=boom)
+    with pytest.raises(RuntimeError):
+        agent.ask("hola")
+    assert agent.telemetry.summary()["errores"] == 1
+
+
+# ---------- doctor ----------
+def test_doctor_detects_wrong_key_format(monkeypatch, settings: Settings):
+    from dataclasses import replace
+
+    from deco.doctor import FAIL, check_model
+
+    monkeypatch.setenv("GROQ_API_KEY", "grok_abc")
+    checks = check_model(replace(settings, model="groq/openai/gpt-oss-120b"))
+    key = next(c for c in checks if c.name == "API key")
+    assert key.status == FAIL and "gsk_" in key.detail
+
+
+def test_doctor_detects_shadow_package(tmp_path: Path):
+    from deco.doctor import FAIL, check_package_location
+
+    (tmp_path / "deco").mkdir()
+    (tmp_path / "deco" / "__init__.py").write_text("")
+    assert check_package_location(cwd=tmp_path).status == FAIL
+
+
+def test_doctor_brain_content_ok(settings: Settings):
+    from deco.doctor import FAIL, check_brain_content
+
+    checks = check_brain_content(settings)
+    assert all(c.status != FAIL for c in checks)
+
+
+# ---------- evals ----------
+def test_eval_checks_are_accent_and_case_insensitive():
+    from deco.evals import evaluate
+
+    case = {
+        "must_include_any": ["no tengo registro"],
+        "must_not_include": ["sí, tenés"],
+        "cites_source": True,
+        "max_questions": 1,
+        "must_call_tool": ["query_db"],
+    }
+    results = {
+        r.check: r.passed
+        for r in evaluate(case, "No TENGO registro de Kafka. Fuentes: skills.yaml", ["query_db"])
+    }
+    assert all(results.values())
+    bad = {r.check: r.passed for r in evaluate(case, "Sí, tenés mucha. ¿Algo más? ¿Y vos?", [])}
+    assert not any(bad.values())
+
+
+def test_run_case_on_demo_brain_with_fake_model():
+    from deco.evals import EVALS_DIR, load_cases, run_case
+
+    case = load_cases(EVALS_DIR / "questions.yaml", only="prioriza-con-datos")[0]
+    script = [
+        _resp(tool_calls=[_tool_call("query_db", {"sql": "select skill_id from mart_skill_gaps limit 1"})]),
+        _resp(content="Empezá por Databricks. Fuentes: query mart_skill_gaps"),
+    ]
+    result = run_case(case, EVALS_DIR / "demo_brain", "fake", completion=lambda **kw: script.pop(0))
+    assert result.passed, result.checks
+    assert result.tools_used == ["query_db"] and result.tokens == 240
+
+
+def test_demo_brain_is_consistent(tmp_path: Path):
+    import shutil as sh
+
+    from deco.evals import EVALS_DIR
+
+    root = tmp_path / "demo"
+    sh.copytree(EVALS_DIR / "demo_brain", root)
+    counts = build_db(Brain(root), tmp_path / "demo.duckdb")
+    assert counts["jobs"] == 1 and counts["projects"] == 1
+    _, rows = run_query(tmp_path / "demo.duckdb", "select count(*) from mart_unmapped_requirements")
+    assert rows == [(0,)]

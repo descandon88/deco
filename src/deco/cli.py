@@ -21,6 +21,7 @@ from deco.config import load_settings
 from deco.context import load_prompt
 from deco.db import build_db, run_query
 from deco.memory import Brain
+from deco.telemetry import Telemetry
 from deco.tools import Toolbox
 
 # app = typer.Typer(help="Deco: mentor de IA con memoria propia. Sin argumentos abre el chat.")
@@ -35,6 +36,7 @@ HELP = """[bold]Comandos dentro del chat[/bold]
   /weekly             revisión semanal
   /learn <tema>       explicación + preguntas (ej: /learn dbt incremental models)
   /lang es|en|mix     idioma de las respuestas
+  /stats              tokens, costo y latencia de esta sesión
   /model <nombre>     cambiar de modelo en caliente
   /help  /salir"""
 
@@ -72,6 +74,7 @@ def _make_agent(model: str | None = None) -> Agent:
         temperature=settings.temperature,
         max_tokens=settings.max_tokens,
     )
+    agent.telemetry = Telemetry(brain=brain)
     agent.on_wait = lambda s: console.print(
         f"[yellow]  ⏳ límite de tokens del proveedor: espero {s:.0f}s y reintento...[/yellow]"
     )
@@ -99,6 +102,22 @@ def _expand_command(line: str) -> str | None:
         return load_prompt("weekly")
     console.print(f"[yellow]Comando desconocido: {cmd}[/yellow]")
     return None
+
+
+def _print_stats(summary: dict) -> None:
+    table = Table("métrica", "valor", title="Esta sesión")
+    for key, value in summary.items():
+        table.add_row(key.replace("_", " "), "-" if value is None else str(value))
+    console.print(table)
+
+
+def _print_query(sql_text: str, title: str | None = None) -> None:
+    s = load_settings()
+    cols, rows = run_query(s.db_path, sql_text)
+    table = Table(*cols, title=title)
+    for r in rows:
+        table.add_row(*["" if v is None else str(v) for v in r])
+    console.print(table)
 
 
 def _answer(agent: Agent, text: str) -> None:
@@ -133,6 +152,9 @@ def chat(model: str | None = typer.Option(None, help="Override del modelo (forma
         # if line == "/help":
         if line in ("/help", "/"):
             console.print(HELP)
+            continue
+        if line == "/stats":
+            _print_stats(agent.telemetry.summary())
             continue
         if line.startswith("/lang"):
             try:
@@ -197,6 +219,74 @@ def sql(query: str):
     for r in rows:
         table.add_row(*["" if v is None else str(v) for v in r])
     console.print(table)
+
+
+@app.command()
+def doctor(
+    ping: bool = typer.Option(False, help="Hace una llamada mínima al modelo para probar clave y modelo."),
+):
+    """Diagnóstico del entorno: brain, git, .env, API key, dependencias y base de datos."""
+    from deco.doctor import FAIL, OK, WARN, run_all
+
+    icons = {OK: "[green]✓[/green]", WARN: "[yellow]![/yellow]", FAIL: "[red]✗[/red]"}
+    table = Table("", "chequeo", "detalle", "cómo arreglarlo", title="deco doctor")
+    checks = run_all(load_settings(), ping=ping)
+    for ch in checks:
+        table.add_row(icons[ch.status], ch.name, ch.detail, ch.hint)
+    console.print(table)
+    fails = sum(ch.status == FAIL for ch in checks)
+    warns = sum(ch.status == WARN for ch in checks)
+    console.print(f"{fails} errores · {warns} advertencias")
+    if fails:
+        raise typer.Exit(1)
+
+
+@app.command("eval")
+def eval_cmd(
+    model: str | None = typer.Option(None, help="Modelo a evaluar (por defecto, DECO_MODEL)."),
+    case: str | None = typer.Option(None, help="Correr un solo caso por id."),
+    min_score: float = typer.Option(0.0, help="Falla (exit 1) si el puntaje queda por debajo."),
+):
+    """Evals: mide el comportamiento de Deco con casos fijos sobre un brain ficticio."""
+    from deco.evals import EVALS_DIR, load_cases, run_evals
+
+    model = model or load_settings().model
+    cases = load_cases(EVALS_DIR / "questions.yaml", only=case)
+    if not cases:
+        console.print("[red]No hay casos para correr.[/red]")
+        raise typer.Exit(1)
+    console.print(f"Evaluando [bold]{model}[/bold] con {len(cases)} casos (usa la API: gasta tokens)...")
+
+    def show(r):
+        mark = "[green]✓[/green]" if r.passed else "[red]✗[/red]"
+        failed = "; ".join(f"{c.check}: {c.detail}" for c in r.checks if not c.passed)
+        console.print(f"  {mark} {r.id}  [dim]{r.tokens} tokens · {r.latency_ms} ms[/dim]  {failed}")
+
+    report = run_evals(model, cases, EVALS_DIR / "demo_brain", on_result=show)
+    path = report.save(EVALS_DIR / "results")
+    passed = sum(r.passed for r in report.results)
+    console.print(
+        f"\n[bold]Puntaje: {passed}/{len(report.results)} ({report.score:.0%})[/bold]  ·  detalle: {path}"
+    )
+    if report.score < min_score:
+        raise typer.Exit(1)
+
+
+@app.command()
+def stats(days: int = typer.Option(7, help="Cuántos días mirar.")):
+    """Uso del modelo: llamadas, tokens, costo, latencia y herramientas (observabilidad)."""
+    s = load_settings()
+    counts = build_db(Brain(s.brain_path), s.db_path)
+    if not counts.get("llm_calls"):
+        console.print("[yellow]Todavía no hay llamadas registradas. Usá `deco` un rato y volvé.[/yellow]")
+        return
+    _print_query(
+        "select day, model, calls, errors, prompt_tokens, completion_tokens, cost_usd, "
+        f"avg_latency_ms, p95_latency_ms, rate_limit_wait_s, loops_trimmed from mart_llm_usage_daily "
+        f"where day >= current_date - {int(days)}",
+        title=f"Uso por día (últimos {days} días)",
+    )
+    _print_query("select * from mart_tool_usage", title="Herramientas más usadas")
 
 
 if __name__ == "__main__":

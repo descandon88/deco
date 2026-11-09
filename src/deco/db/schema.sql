@@ -57,6 +57,23 @@ CREATE TABLE job_requirements (
     importance    VARCHAR                -- must | nice
 );
 
+-- Hechos: llamadas al modelo (observabilidad, desde telemetry/*.jsonl)
+CREATE TABLE llm_calls (
+    call_id           VARCHAR PRIMARY KEY,
+    session_id        VARCHAR,
+    ts                TIMESTAMP,
+    model             VARCHAR,
+    prompt_tokens     INTEGER,
+    completion_tokens INTEGER,
+    latency_ms        INTEGER,
+    waited_s          DOUBLE,
+    cost_usd          DOUBLE,
+    tool_calls        VARCHAR[],
+    status            VARCHAR,               -- ok | error
+    error             VARCHAR,
+    loop_trimmed      BOOLEAN
+);
+
 -- ------------------------------------------------------------
 -- MARTS (vistas). Lo que el agente consulta para decidir.
 -- ------------------------------------------------------------
@@ -111,3 +128,41 @@ SELECT date_trunc('week', ts)        AS week,
 FROM events
 GROUP BY ALL
 ORDER BY week DESC, type;
+
+-- Uso del modelo por día y modelo: costo, tokens, latencia y calidad operativa
+CREATE VIEW mart_llm_usage_daily AS
+SELECT CAST(ts AS DATE)                                        AS day,
+       model,
+       count(*)                                                AS calls,
+       count(*) FILTER (WHERE status = 'error')                AS errors,
+       sum(coalesce(prompt_tokens, 0))                         AS prompt_tokens,
+       sum(coalesce(completion_tokens, 0))                     AS completion_tokens,
+       round(sum(coalesce(cost_usd, 0)), 4)                    AS cost_usd,
+       round(avg(latency_ms) FILTER (WHERE status = 'ok'))     AS avg_latency_ms,
+       round(quantile_cont(latency_ms, 0.95) FILTER (WHERE status = 'ok')) AS p95_latency_ms,
+       round(sum(waited_s), 1)                                 AS rate_limit_wait_s,
+       count(*) FILTER (WHERE loop_trimmed)                    AS loops_trimmed
+FROM llm_calls
+GROUP BY ALL
+ORDER BY day DESC, model;
+
+-- Una fila por sesión de chat
+CREATE VIEW mart_llm_sessions AS
+SELECT session_id,
+       min(ts)                                                 AS started_at,
+       any_value(model)                                        AS model,
+       count(*)                                                AS calls,
+       sum(coalesce(prompt_tokens, 0) + coalesce(completion_tokens, 0)) AS total_tokens,
+       round(sum(coalesce(cost_usd, 0)), 4)                    AS cost_usd,
+       sum(len(tool_calls))                                    AS tool_calls,
+       count(*) FILTER (WHERE status = 'error')                AS errors
+FROM llm_calls
+GROUP BY session_id
+ORDER BY started_at DESC;
+
+-- Qué herramientas usa el modelo y cuánto
+CREATE VIEW mart_tool_usage AS
+SELECT tool, count(*) AS uses
+FROM (SELECT unnest(tool_calls) AS tool FROM llm_calls)
+GROUP BY tool
+ORDER BY uses DESC;

@@ -6,7 +6,17 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
+
+USER_ENV = Path("~/.config/deco/.env").expanduser()
+
+
+def env_sources() -> list[Path]:
+    """Archivos .env que Deco encuentra, en orden de prioridad."""
+    found = [Path(f) for f in [find_dotenv(usecwd=True), find_dotenv()] if f]
+    if USER_ENV.exists():
+        found.append(USER_ENV)
+    return list(dict.fromkeys(found))  # sin duplicados, mantiene el orden
 
 
 @dataclass(frozen=True)
@@ -24,7 +34,7 @@ class Settings:
 def load_settings() -> Settings:
     # 1) .env del directorio actual  2) ~/.config/deco/.env
     load_dotenv()
-    load_dotenv(Path("~/.config/deco/.env").expanduser())
+    load_dotenv(USER_ENV)
 
     brain = Path(os.getenv("DECO_BRAIN_PATH", "~/deco-brain")).expanduser()
     db_default = brain / ".cache" / "brain.duckdb"

@@ -13,6 +13,7 @@ from typing import Any
 
 from deco.context import build_system_prompt
 from deco.memory import Brain
+from deco.telemetry import Telemetry
 from deco.tools import TOOL_SPECS, Toolbox
 
 MAX_STEPS = 12
@@ -80,6 +81,7 @@ class Agent:
         self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain, language)}]
         self.on_wait: OnWaitFn | None = None
         self.sleep: Callable[[float], None] = time.sleep
+        self.telemetry = Telemetry(brain=None)  # la CLI la reemplaza por una que escribe en el brain
 
     def set_language(self, language: str) -> None:
         """Cambia el idioma en caliente: reescribe el prompt del sistema (se valida antes)."""
@@ -87,24 +89,38 @@ class Agent:
         self.language = language
         self.messages[0] = {"role": "system", "content": prompt}
 
-    def _complete(self) -> Any:
-        """Llama al modelo; ante un rate limit espera lo que pide el proveedor y reintenta."""
+    def _complete(self) -> tuple[Any, int, float]:
+        """Llama al modelo; ante un rate limit espera lo que pide el proveedor y reintenta.
+
+        Devuelve (respuesta, latencia_ms de la llamada exitosa, segundos esperados por rate limit).
+        """
+        waited = 0.0
         for attempt in range(MAX_RATE_LIMIT_WAITS + 1):
+            start = time.perf_counter()
             try:
-                return self.completion(
+                response = self.completion(
                     model=self.model,
                     messages=self.messages,
                     tools=TOOL_SPECS,
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                 )
+                return response, int((time.perf_counter() - start) * 1000), waited
             except Exception as exc:
                 wait = _rate_limit_wait(exc)
                 if wait is None or attempt == MAX_RATE_LIMIT_WAITS:
+                    self.telemetry.record(
+                        model=self.model,
+                        latency_ms=int((time.perf_counter() - start) * 1000),
+                        waited_s=waited,
+                        status="error",
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
                     raise
                 if self.on_wait:
                     self.on_wait(wait)
                 self.sleep(wait)
+                waited += wait
         raise RuntimeError("unreachable")
 
     def ask(self, user_text: str, on_tool: OnToolFn | None = None) -> str:
@@ -119,9 +135,18 @@ class Agent:
     def _ask(self, user_text: str, on_tool: OnToolFn | None = None) -> str:
         self.messages.append({"role": "user", "content": user_text})
         for _ in range(MAX_STEPS):
-            response = self._complete()
+            response, latency_ms, waited = self._complete()
             msg = response.choices[0].message
             tool_calls = getattr(msg, "tool_calls", None) or []
+            clean = None if tool_calls else trim_repetition(msg.content or "")
+            self.telemetry.record(
+                model=self.model,
+                response=response,
+                latency_ms=latency_ms,
+                waited_s=waited,
+                tool_calls=[tc.function.name for tc in tool_calls],
+                loop_trimmed=clean is not None and clean != (msg.content or ""),
+            )
 
             assistant: dict = {"role": "assistant", "content": msg.content}
             if tool_calls:
@@ -135,8 +160,7 @@ class Agent:
                 ]
             self.messages.append(assistant)
 
-            if not tool_calls:
-                clean = trim_repetition(msg.content or "")
+            if clean is not None:
                 assistant["content"] = clean  # no guardar el bucle en el historial
                 return clean
 

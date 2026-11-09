@@ -1,0 +1,34 @@
+domains:
+  analytics_engineering:
+    - id: sql_window_functions
+      name: SQL avanzado
+      level: 2
+      target: 4
+      evidence: ["projects/ventas-dbt.md"]
+    - id: dbt
+      name: dbt
+      level: 2
+      target: 4
+      evidence: ["projects/ventas-dbt.md"]
+    - id: dimensional_modeling
+      name: Modelado dimensional
+      level: 1
+      target: 3
+      evidence: []
+  data_engineering:
+    - id: python_data
+      name: Python para datos
+      level: 2
+      target: 3
+      evidence: []
+    - id: azure_databricks
+      name: Databricks
+      level: 0
+      target: 3
+      evidence: []
+  bi:
+    - id: bi_dashboards
+      name: Dashboards (Power BI)
+      level: 3
+      target: 3
+      evidence: ["Ficticia SA: dashboards de ventas"]

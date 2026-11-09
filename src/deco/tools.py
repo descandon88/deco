@@ -68,7 +68,8 @@ TOOL_SPECS = [
             "description": (
                 "Ejecuta SQL de SOLO LECTURA (DuckDB) sobre la capa estructurada. Tablas: skills, "
                 "events, projects, jobs, job_requirements. Vistas: mart_skill_gaps, "
-                "mart_unmapped_requirements, mart_weekly_activity."
+                "mart_unmapped_requirements, mart_weekly_activity. Observabilidad: llm_calls, "
+                "mart_llm_usage_daily, mart_llm_sessions, mart_tool_usage."
             ),
             "parameters": {"type": "object", "properties": {"sql": {"type": "string"}}, "required": ["sql"]},
         },

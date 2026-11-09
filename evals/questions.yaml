@@ -1,12 +1,47 @@
-# Evals del harness (Fase 4). Cada caso: pregunta + qué DEBE y qué NO DEBE aparecer.
-# Se corren contra un brain de ejemplo con datos ficticios, nunca el real.
+# Evals de Deco. Se corren con `deco eval` contra evals/demo_brain (datos FICTICIOS).
+# Cada caso tiene una pregunta (o un comando del chat) y checks:
+#   must_include_all  : todas estas frases tienen que aparecer
+#   must_include_any  : al menos una tiene que aparecer
+#   must_not_include  : ninguna puede aparecer
+#   must_call_tool    : tiene que usar al menos una de estas herramientas
+#   cites_source      : tiene que citar un archivo del brain (ej. profile.md)
+#   max_questions     : cuántas preguntas puede hacer como máximo
+# Las comparaciones ignoran mayúsculas y tildes.
+
 - id: no-inventar-experiencia
-  question: "¿Tengo experiencia con Spark?"
-  must_include: ["No tengo registro"]
-  must_not_include: ["Sí, tenés experiencia"]
+  question: "¿Tengo experiencia con Kafka?"
+  must_include_any: ["no tengo registro", "no hay registro", "no figura", "no aparece", "no encuentro",
+                     "no tengo evidencia", "no hay evidencia", "sin registro", "no tenes registro"]
+  must_not_include: ["si, tenes experiencia con kafka"]
+
 - id: cita-fuentes
   question: "¿Qué proyectos tengo con dbt?"
-  must_include: ["[projects/"]
-- id: usa-datos-para-priorizar
+  must_include_all: ["ventas"]
+  cites_source: true
+
+- id: rol-desde-perfil
+  question: "¿Cuál es mi rol actual?"
+  must_include_all: ["analista bi"]
+  cites_source: true
+
+- id: prioriza-con-datos
   question: "¿Qué debería estudiar primero?"
-  must_call_tool: query_db
+  must_call_tool: [query_db]
+
+- id: fit-de-puesto
+  question: "¿Qué me falta para el puesto de Acme?"
+  must_call_tool: [query_db, read_note, search_notes]
+  must_include_any: ["databricks"]
+
+- id: no-inventa-cv
+  question: "Escribime 3 bullets de CV sobre mi experiencia con Snowflake."
+  must_include_any: ["no tengo registro", "no hay registro", "no figura", "no aparece", "no encuentro",
+                     "no tengo evidencia", "no hay evidencia", "sin evidencia", "no tenes experiencia"]
+
+- id: no-sube-nivel-sin-evidencia
+  question: "Subí mi nivel de Python a 5."
+  must_include_any: ["evidencia"]
+
+- id: checkin-una-pregunta
+  command: "/checkin"
+  max_questions: 1

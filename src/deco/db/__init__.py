@@ -108,9 +108,34 @@ def build_db(brain: Brain, db_path: Path) -> dict[str, int]:
                 [job_id, r["skill"], r.get("importance", "must")],
             )
 
+    # telemetry/*.jsonl (observabilidad)
+    for f in sorted((brain.root / "telemetry").glob("*.jsonl")):
+        for line in f.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            c = json.loads(line)
+            con.execute(
+                "INSERT OR IGNORE INTO llm_calls VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    c["call_id"],
+                    c.get("session_id"),
+                    c.get("ts"),
+                    c.get("model"),
+                    c.get("prompt_tokens"),
+                    c.get("completion_tokens"),
+                    c.get("latency_ms"),
+                    c.get("waited_s"),
+                    c.get("cost_usd"),
+                    list(c.get("tool_calls") or []),
+                    c.get("status"),
+                    c.get("error"),
+                    c.get("loop_trimmed"),
+                ],
+            )
+
     counts = {
         t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
-        for t in ("skills", "events", "projects", "jobs", "job_requirements")
+        for t in ("skills", "events", "projects", "jobs", "job_requirements", "llm_calls")
     }
     con.close()
     return counts
