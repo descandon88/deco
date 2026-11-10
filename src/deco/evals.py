@@ -75,6 +75,13 @@ def evaluate(case: dict, answer: str, tools_used: list[str]) -> list[CheckResult
     if case.get("cites_source"):
         ok = bool(_CITATION.search(answer))
         results.append(CheckResult("cites_source", ok, "" if ok else "no citó archivos del brain"))
+    if (limit := case.get("max_words")) is not None:
+        n = len(answer.split())
+        results.append(CheckResult("max_words", n <= limit, f"{n} palabras (máx. {limit})"))
+    if case.get("no_tables") and re.search(r"^\s*\|.*\|\s*$", answer, re.MULTILINE):
+        results.append(CheckResult("no_tables", False, "usó una tabla"))
+    elif case.get("no_tables"):
+        results.append(CheckResult("no_tables", True))
     if (limit := case.get("max_questions")) is not None:
         n = answer.count("?")
         results.append(CheckResult("max_questions", n <= limit, f"{n} preguntas (máx. {limit})"))
@@ -97,7 +104,7 @@ def run_case(case: dict, demo_brain: Path, model: str, completion: Any = None) -
         brain = Brain(root)
         toolbox = Toolbox(brain, settings, confirm=lambda *_: False)  # evals nunca escriben memoria
         kwargs = {"completion": completion} if completion else {}
-        agent = Agent(brain, toolbox, model=model, temperature=0.3, **kwargs)
+        agent = Agent(brain, toolbox, model=model, temperature=0.3, db_path=settings.db_path, **kwargs)
         tools_used: list[str] = []
         text = case.get("question") or _expand_command(case["command"]) or ""
         start = time.perf_counter()

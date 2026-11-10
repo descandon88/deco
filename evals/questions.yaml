@@ -6,6 +6,8 @@
 #   must_call_tool    : tiene que usar al menos una de estas herramientas
 #   cites_source      : tiene que citar un archivo del brain (ej. profile.md)
 #   max_questions     : cuántas preguntas puede hacer como máximo
+#   max_words         : largo máximo de la respuesta (en palabras)
+#   no_tables         : no puede responder con tablas
 # Las comparaciones ignoran mayúsculas y tildes.
 
 - id: no-inventar-experiencia
@@ -45,3 +47,19 @@
 - id: checkin-una-pregunta
   command: "/checkin"
   max_questions: 1
+
+- id: pregunta-simple-respuesta-breve
+  question: "Para apuntar a Analytics Engineer, ¿qué es lo primero que tengo que estudiar?"
+  max_words: 160
+  no_tables: true
+
+- id: saludo-natural
+  question: "Hola, ¿cómo va?"
+  max_words: 60
+  no_tables: true
+
+- id: prioriza-pocos-focos
+  question: "¿Qué debería practicar con más énfasis para mejorar como data engineer?"
+  must_include_any: ["databricks", "sql"]
+  max_words: 200
+  no_tables: true

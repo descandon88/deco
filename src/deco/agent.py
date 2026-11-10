@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from deco.context import build_system_prompt
@@ -70,6 +71,7 @@ class Agent:
         language: str = "es",
         temperature: float = 0.7,
         max_tokens: int = 2500,
+        db_path: Path | None = None,
     ):
         self.brain = brain
         self.toolbox = toolbox
@@ -78,14 +80,17 @@ class Agent:
         self.language = language
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(brain, language)}]
+        self.db_path = db_path
+        self.messages: list[dict] = [
+            {"role": "system", "content": build_system_prompt(brain, language, db_path)}
+        ]
         self.on_wait: OnWaitFn | None = None
         self.sleep: Callable[[float], None] = time.sleep
         self.telemetry = Telemetry(brain=None)  # la CLI la reemplaza por una que escribe en el brain
 
     def set_language(self, language: str) -> None:
         """Cambia el idioma en caliente: reescribe el prompt del sistema (se valida antes)."""
-        prompt = build_system_prompt(self.brain, language)
+        prompt = build_system_prompt(self.brain, language, self.db_path)
         self.language = language
         self.messages[0] = {"role": "system", "content": prompt}
 

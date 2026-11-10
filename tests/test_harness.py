@@ -310,3 +310,27 @@ def test_demo_brain_is_consistent(tmp_path: Path):
     assert counts["jobs"] == 1 and counts["projects"] == 1
     _, rows = run_query(tmp_path / "demo.duckdb", "select count(*) from mart_unmapped_requirements")
     assert rows == [(0,)]
+
+
+def test_eval_length_and_table_checks():
+    from deco.evals import evaluate
+
+    case = {"max_words": 10, "no_tables": True}
+    short = {r.check: r.passed for r in evaluate(case, "Empezá por SQL con CTEs.", [])}
+    assert all(short.values())
+    long_table = "palabra " * 20 + "\n| a | b |\n|---|---|"
+    bad = {r.check: r.passed for r in evaluate(case, long_table, [])}
+    assert not bad["max_words"] and not bad["no_tables"]
+
+
+def test_system_prompt_includes_priorities_and_feedback(brain: Brain, settings: Settings):
+    from deco.context import build_system_prompt
+
+    brain.write(
+        "interviews/2026-11-acme.md", "# Acme\n## Fortalezas\n- modelado\n## A fortalecer\n1. SQL en vivo\n"
+    )
+    prompt = build_system_prompt(brain, "es", settings.db_path)
+    priorities = prompt.split("# PRIORIDADES ACTUALES")[1].split("# ÚLTIMO FEEDBACK")[0]
+    assert "1. " in priorities
+    feedback = prompt.split("# ÚLTIMO FEEDBACK EXTERNO")[1].split("# ÍNDICE")[0]
+    assert "SQL en vivo" in feedback and "modelado" not in feedback

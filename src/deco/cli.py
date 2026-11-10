@@ -73,6 +73,7 @@ def _make_agent(model: str | None = None) -> Agent:
         language=settings.language,
         temperature=settings.temperature,
         max_tokens=settings.max_tokens,
+        db_path=settings.db_path,
     )
     agent.telemetry = Telemetry(brain=brain)
     agent.on_wait = lambda s: console.print(
